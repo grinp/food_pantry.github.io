@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html>
+<head>
+	
+    <!--Add a title below-->
+	<title>Malcolm Mobile Food Pantry</title>
+
+    <!--Add a comment here explaining what we are doing in next three lines-->
+      <!--I think the first line calls to style file of leaflet map, the second line opens leaflet map itself and the third line opens geojson file with objects.-->
+	<link rel="stylesheet" href="leaflet/leaflet.css"/>
+    <script src="leaflet/leaflet.js"></script>
+    <script src="County.geojson"></script> 
+    <script src="Malcolm.geojson"></script>
+    
+    <style>
+		html, body {
+			height: 100%;
+			margin: 0;
+            }
+        #map{
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+        }
+        
+    
+		.info {
+			padding: 6px 8px;
+			font: 14px/16px Arial, Helvetica, sans-serif;
+			background: white;
+			background: rgba(255,255,255,0.8);
+			box-shadow: 0 0 15px rgba(0,0,0,0.2);
+			border-radius: 5px;
+		}
+		.info h4 {
+			margin: 0 0 5px;
+			color: #777;
+		}
+
+		.legend {
+			text-align: left;
+			line-height: 18px;
+			color: #555;
+		}
+		.legend i {
+			width: 18px;
+			height: 18px;
+			float: left;
+			margin-right: 8px;
+			opacity: 0.7;
+		}
+    </style>
+	
+</head>
+<body>
+<!--This is the div element where the map will go, it is given the id="map" which will be referenced below-->
+<div id="map"></div>
+
+<script>
+	
+    <!--Add a comment here-->
+    <!--Here we are going to open our map with central coordinates 42.0667, -93.4 and with zoom level 8 -->
+	var map = L.map('map').setView([41.707508, -92.553011], 9);
+
+    <!--Add a comment here -->
+    <!--Lines below escribe which  stile of the map we want to use. As I understand we are goin to use Stamen design and creativecommos. for map data we are going to use openstreet map. We make max zoom as 20 and min zoom as 0.   -->
+    
+	L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}', {
+	attribution: 'Tiles &copy; Esri &mdash; Source: Esri, DeLorme, NAVTEQ, USGS, Intermap, iPC, NRCAN, Esri Japan, METI, Esri China (Hong Kong), Esri (Thailand), TomTom, 2012'
+    }).addTo(map);
+
+    <!--Add a comment here for couple lines of code below-->
+    <!-- Here we put our marker to the point with next coordinates 42.0667, -93.4. This market will give us the next sentence "we are going to move this point and change this tex"  -->
+	L.marker([41.707508, -92.553011]).addTo(map)
+		.bindPopup("Malcolm town").openPopup();
+        
+    <!--Add a comment here for chunk of code below-->
+    <!-- Here we have style describtion for our geoJson objects -->
+    
+    L.geoJSON(county, {
+        style: {
+            color: "blue",
+            weight: 2,
+            fillOpacity: 0.0
+            
+        }
+    }).addTo(map)
+    
+        // create a control which will go in a div element and will display information from the CBG
+	var info = L.control();
+
+    //create the div element, doing this through JavaScript, could have done differently (HTML)
+	info.onAdd = function (map) {
+		this._div = L.DomUtil.create('div', 'info');
+		this.update();
+		return this._div;
+	};
+
+    //where we set up the information that will be presented in the info window in the uppper right
+    //the props are the attributes being read from the CBG geojson 
+	info.update = function (props) {
+		this._div.innerHTML = '<h4>Number of Customers </h4>' +  (props ?
+			'by Census Block Group for Malcom Mobile Food Pantry<br/><br/>' + 
+            props.NumCust + ' customers<br/><br/>' + 
+            'Socio-demographic characteristics: <br/>' +
+            props.MED_AGE + ' Median Age <br/>' + 
+            props.AVE_FAM_SZ + ' Average family size <br/>' +
+            props.WhitePerc.toFixed(2) + ' Percentage of the population which is White <br/>' +
+            props.RenterPerc.toFixed(2) + ' Percentage of households that are rentals <br/>' 
+			: 'Hover over a CBG');
+	};
+	info.addTo(map);
+
+
+	// this is a function to setting up the color scheme the CBG geojson layer in the map will use, using kind of an orange to red 
+    //this function gets called below 
+    //you ccould change to a different system
+	function getColor(d) {
+		return d > 50 ? '#800026' :
+				d > 30  ? '#BD0026' :
+				d > 15  ? '#E31A1C' :
+				d > 7  ? '#FC4E2A' :
+				d > 4   ? '#FD8D3C' :
+				d > 2   ? '#FEB24C' :
+				d > 1   ? '#FED976' :
+							'#FFEDA0';
+	}
+
+    //this is a function where all the stying is set up 
+    //the last line in there calls the function above and passes the NumCust field or attribute to use to 
+    //thematically render the layer 
+	function style(feature) {
+		return {
+			weight: 2,
+			opacity: 1,
+			color: 'white',
+			dashArray: '3',
+			fillOpacity: 0.7,
+			fillColor: getColor(feature.properties.NumCust)
+		};
+	}
+    
+    //this function is the code that gets called from below when user hovers on polygon
+    //it changes sytling of the polygon hovered on and then updates the info element in the upper right
+	function highlightFeature(e) {
+		var layer = e.target;
+
+		layer.setStyle({
+			weight: 5,
+			color: '#666',
+			dashArray: '',
+			fillOpacity: 0.7
+		});
+
+		if (!L.Browser.ie && !L.Browser.opera && !L.Browser.edge) {
+			layer.bringToFront();
+		}
+
+		info.update(layer.feature.properties);
+	}
+
+    //we set up a variable to use below 
+	var geojson;
+
+    //resets the polygon symbology after user moves cursor off the polygon
+	function resetHighlight(e) {
+		geojson.resetStyle(e.target);
+		info.update();
+	}
+
+    //onEachFeature is a leaflet function where we indicate what we want to do on certain events
+    //in this case, we call two specific functions for when mouseover (change stying to highlight polygon hovered over)
+    //or mouseout (reset styling for polygon) events happen
+	function onEachFeature(feature, layer) {
+		layer.on({
+			mouseover: highlightFeature,
+			mouseout: resetHighlight,
+
+		});
+	}
+
+    //here we actually add the CBG geojson file and set the style but calling the style function
+    // and calling the onEachFeature function to handle dynamic events (hover or mouseover, click, mouseout) 
+	geojson = L.geoJson(cbg, {
+		style: style,
+		onEachFeature: onEachFeature
+	}).addTo(map);
+
+
+    //here a legend object is created and put in the bottom right of the page
+	var legend = L.control({position: 'bottomright'});
+
+    //below what happens when the legend is added 
+	legend.onAdd = function (map) {
+        //actuall create a div html element and then setting up the legend
+        //to be honest, I don't understand this entirely but this is tied to the 
+        //thematic classes set above so they match
+		var div = L.DomUtil.create('div', 'info legend'),
+			grades = [0, 1, 2, 4, 7, 15, 30, 50],
+			labels = [],
+			from, to;
+
+		for (var i = 0; i < grades.length; i++) {
+			from = grades[i];
+			to = grades[i + 1];
+
+			labels.push(
+				'<i style="background:' + getColor(from + 1) + '"></i> ' +
+				from + (to ? '&ndash;' + to : '+'));
+		}
+
+		div.innerHTML = labels.join('<br>');
+		return div;
+	};
+
+    //actually add the legend. 
+	legend.addTo(map);
+    
+
+</script>
+
+</body>
+</html>
